@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>交易盈虧紀錄｜USDT</title>
+<style>
+:root{--bg:#0b1020;--panel:#141c30;--panel2:#1a2540;--text:#edf2ff;--muted:#91a0bd;--line:#293653;--green:#35d39a;--red:#ff6b7d;--blue:#7da7ff}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#0b1020,#101a30);color:var(--text);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:24px}
+.wrap{max-width:1100px;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:22px}
+h1{font-size:25px;margin:0 0 4px}.sub{color:var(--muted);font-size:13px}
+.pill{border:1px solid #38517c;color:#b8ccff;border-radius:99px;padding:7px 12px;font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.card,.panel{background:rgba(20,28,48,.94);border:1px solid var(--line);border-radius:16px;padding:17px;box-shadow:0 10px 28px #0002}
+.k{color:var(--muted);font-size:12px}.v{font-size:25px;font-weight:750;margin-top:5px;letter-spacing:.2px}.small{font-size:12px;color:var(--muted);margin-top:3px}
+.green{color:var(--green)}.red{color:var(--red)}
+.layout{display:grid;grid-template-columns: minmax(280px, .85fr) minmax(0,1.5fr);gap:14px}
+h2{font-size:16px;margin:0 0 14px}
+label{display:block;color:var(--muted);font-size:12px;margin:11px 0 5px}
+input,select{width:100%;background:#0d1528;color:var(--text);border:1px solid #344361;border-radius:9px;padding:11px;font-size:14px;outline:none}
+input:focus,select:focus{border-color:var(--blue)}
+button{border:0;border-radius:9px;padding:11px 14px;font-weight:700;cursor:pointer}
+.primary{background:var(--blue);color:#091326;width:100%;margin-top:15px}.secondary{background:#263653;color:#dce7ff}.danger{background:#432432;color:#ffb8c2}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.note{font-size:12px;color:var(--muted);margin-top:12px}
+.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:540px}th,td{text-align:left;padding:11px 9px;border-bottom:1px solid var(--line);font-size:13px}th{color:var(--muted);font-weight:600}
+.empty{text-align:center;color:var(--muted);padding:28px}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.actions{display:flex;gap:8px}.actions button{font-size:12px;padding:8px 10px}
+.progress{height:8px;background:#26334d;border-radius:9px;overflow:hidden;margin-top:10px}.progress span{display:block;height:100%;background:var(--green);width:0}
+@media(max-width:760px){body{padding:15px}.grid{grid-template-columns:repeat(2,1fr)}.layout{grid-template-columns:1fr}.v{font-size:22px}}
+</style>
+
+<meta name="theme-color" content="#0b1020">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="交易盈虧">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(console.error));
+}
+</script>
+</head>
+<body>
+<div class="wrap">
+ <div class="top"><div><h1>交易盈虧紀錄</h1><div class="sub">固定本金與風險設定・每筆交易自動統計</div></div><span class="pill">USDT · 起始本金 1,000</span></div>
+ <section class="grid">
+  <div class="card"><div class="k">目前資產</div><div class="v" id="balance">1,000.00 U</div><div class="small">本金 + 累計已實現盈虧</div></div>
+  <div class="card"><div class="k">累計盈虧</div><div class="v" id="pnl">0.00 U</div><div class="small" id="pnlPct">報酬率 0.00%</div></div>
+  <div class="card"><div class="k">勝率</div><div class="v" id="winrate">0.0%</div><div class="small" id="record">0 勝 · 0 敗 · 0 筆</div></div>
+  <div class="card"><div class="k">風險使用率</div><div class="v" id="riskpct">1.00%</div><div class="small">每筆固定停損 10 U / 起始本金</div></div>
+ </section>
+ <div class="layout">
+  <section class="panel">
+   <h2>新增交易紀錄</h2>
+   <form id="tradeForm">
+    <label>交易日期</label><input id="date" type="date" required><div class="note" id="dailyCount">當日已記錄 0 / 5 筆</div>
+    <div class="row">
+     <div><label>交易方向</label><select id="side"><option>做多</option><option>做空</option></select></div>
+     <div><label>交易結果</label><select id="result"><option value="win">獲利</option><option value="loss">停損</option><option value="manual">自訂盈虧</option></select></div>
+    </div>
+    <label id="amountLabel">獲利金額 (U)</label><input id="amount" type="number" step="0.01" min="0" value="10" required>
+    <div class="row">
+     <div><label>交易標的（選填）</label><input id="symbol" placeholder="例如 BTCUSDT"></div>
+     <div><label>備註（選填）</label><input id="memo" placeholder="進場原因／檢討"></div>
+    </div>
+    <button class="primary" type="submit">＋ 儲存交易</button>
+   </form>
+   <div class="note">本機保存版：資料只存在目前 iPhone 的瀏覽器，不需登入。本金 1,000 U、每筆停損 10 U（本金的 1%），每日最多 5 筆。獲利直接輸入實際淨利 U；停損自動記錄 -10 U。請定期使用「備份資料」保存 JSON 檔，更換手機或清除瀏覽器資料前務必先備份。</div>
+   <div style="margin-top:18px"><div class="k">勝率進度</div><div class="progress"><span id="winbar"></span></div></div>
+  </section>
+  <section class="panel">
+   <div class="toolbar"><h2 style="margin:0">交易明細</h2><div class="actions"><button class="secondary" id="export">匯出 CSV</button><button class="secondary" id="backup">備份資料</button><button class="secondary" id="restoreBtn">還原備份</button><input id="restoreFile" type="file" accept=".json,application/json" hidden><button class="danger" id="clear">清空紀錄</button></div></div>
+   <div class="table-wrap"><table><thead><tr><th>日期</th><th>標的 / 方向</th><th>結果</th><th>盈虧 (U)</th><th>累計資產</th><th></th></tr></thead><tbody id="tbody"></tbody></table><div class="empty" id="empty">目前還沒有交易紀錄，新增第一筆交易吧。</div></div>
+  </section>
+ </div>
+</div>
+<script>
+const START=1000, RISK=10, KEY='tradeJournal1000u_v1';
+let trades=[];
+try{trades=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){trades=[]}
+const $=id=>document.getElementById(id);
+$('date').value=new Date().toLocaleDateString('en-CA');
+$('date').addEventListener('change',render);
+function save(){localStorage.setItem(KEY,JSON.stringify(trades));render()}
+function money(n){return (n>0?'+':'')+Number(n).toFixed(2)+' U'}
+function render(){
+ let selectedDate=$('date').value || new Date().toLocaleDateString('en-CA');
+ let dailyCount=trades.filter(t=>t.date===selectedDate).length;
+ $('dailyCount').textContent=`當日已記錄 ${dailyCount} / 5 筆`+(dailyCount>=5?'（已達上限）':'');
+ $('dailyCount').style.color=dailyCount>=5?'var(--red)':'var(--muted)';
+ let pnl=trades.reduce((s,t)=>s+t.pnl,0), wins=trades.filter(t=>t.pnl>0).length, losses=trades.filter(t=>t.pnl<0).length;
+ let bal=START+pnl, wr=(wins+losses)?wins/(wins+losses)*100:0;
+ $('balance').textContent=bal.toFixed(2)+' U';$('pnl').textContent=money(pnl);$('pnl').className='v '+(pnl>0?'green':pnl<0?'red':'');
+ $('pnlPct').textContent='報酬率 '+(pnl/START*100).toFixed(2)+'%';$('winrate').textContent=wr.toFixed(1)+'%';
+ $('record').textContent=`${wins} 勝 · ${losses} 敗 · ${trades.length} 筆`;$('riskpct').textContent=(RISK/START*100).toFixed(2)+'%';
+ $('winbar').style.width=wr+'%';
+ let running=START, rows=[...trades].reverse().map(t=>{running+=t.pnl;return `<tr><td>${t.date}</td><td>${esc(t.symbol||'—')}<br><span class="k">${t.side}</span></td><td>${t.pnl>0?'<span class="green">獲利</span>':t.pnl<0?'<span class="red">虧損</span>':'打平'}</td><td class="${t.pnl>0?'green':t.pnl<0?'red':''}">${money(t.pnl)}</td><td>${running.toFixed(2)} U</td><td><button class="danger" style="padding:6px 8px" onclick="removeTrade('${t.id}')">刪除</button></td></tr>`});
+ $('tbody').innerHTML=rows.join('');$('empty').style.display=trades.length?'none':'block';
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+window.removeTrade=id=>{if(confirm('確定刪除這筆交易？')){trades=trades.filter(t=>t.id!==id);save()}};
+$('result').addEventListener('change',()=>{
+ let r=$('result').value;$('amountLabel').textContent=r==='loss'?'停損金額（固定 10 U）':r==='win'?'獲利金額 (U)':'盈虧金額 (U；可正可負)';
+ $('amount').value=r==='loss'?'10':'10';$('amount').min=r==='manual'?'-100000':'0';
+});
+$('tradeForm').addEventListener('submit',e=>{
+ e.preventDefault();
+ let selectedDate=$('date').value;
+ let countForDate=trades.filter(t=>t.date===selectedDate).length;
+ if(countForDate>=5){alert('這一天已達每日 5 筆交易上限，無法再新增。');return}
+ let r=$('result').value, v=Number($('amount').value);
+ let pnl=r==='loss'?-RISK:r==='win'?Math.abs(v):v;
+ if(!Number.isFinite(pnl)){alert('請輸入有效金額');return}
+ trades.push({id:Date.now().toString(),date:$('date').value,side:$('side').value,result:r,pnl,symbol:$('symbol').value.trim(),memo:$('memo').value.trim()});
+ $('symbol').value='';$('memo').value='';save();
+});
+
+$('backup').onclick=()=>{
+ const payload={app:'交易盈虧紀錄',version:1,exportedAt:new Date().toISOString(),startingCapital:START,riskPerTrade:RISK,trades};
+ const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8;'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download='交易盈虧備份_'+new Date().toLocaleDateString('en-CA')+'.json';a.click();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+$('restoreBtn').onclick=()=>$('restoreFile').click();
+$('restoreFile').onchange=async e=>{
+ const file=e.target.files[0];if(!file)return;
+ try{
+  const data=JSON.parse(await file.text());
+  if(!data||!Array.isArray(data.trades))throw new Error('備份檔格式不正確');
+  if(!confirm(`備份內有 ${data.trades.length} 筆交易。還原會取代目前這台裝置的全部紀錄，確定繼續嗎？`))return;
+  const valid=data.trades.every(t=>t&&typeof t.date==='string'&&Number.isFinite(Number(t.pnl))&&typeof t.side==='string');
+  if(!valid)throw new Error('備份內容缺少必要欄位或資料格式錯誤');
+  trades=data.trades.map(t=>({...t,pnl:Number(t.pnl),id:String(t.id||Date.now()+Math.random())}));
+  save();alert('備份還原完成。');
+ }catch(err){alert('無法還原：'+err.message)}
+ finally{$('restoreFile').value=''}
+};
+
+$('clear').onclick=()=>{if(confirm('確定清空所有交易紀錄？此動作無法復原。')){trades=[];save()}};
+$('export').onclick=()=>{
+ let lines=[['日期','標的','方向','盈虧(U)','備註','累計資產(U)']];let b=START;
+ trades.forEach(t=>{b+=t.pnl;lines.push([t.date,t.symbol,t.side,t.pnl,t.memo,b.toFixed(2)])});
+ let csv='\ufeff'+lines.map(row=>row.map(x=>'"'+String(x??'').replace(/"/g,'""')+'"').join(',')).join('\n');
+ let a=document.createElement('a'),url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));a.href=url;a.download='交易盈虧紀錄.csv';a.click();URL.revokeObjectURL(url);
+};
+render();
+</script>
+</body></html>
